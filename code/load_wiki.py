@@ -32,7 +32,7 @@ class Wiki_articles:
     def __init__(self, dir = None, seed =None):
 
         if dir is None: #Hack for my homedir
-            dir = '/home/karen/projects/LSTM_RNN_PoetryGenerator/data/text/'
+            dir = '../data/text/'
         
         files =[]
         subdirs = [ s for s in listdir(dir)]
@@ -76,7 +76,7 @@ class Vocab:
         self.unknown = [0,0]
                 
     def add_syllables(self, text):
-        for word in findall(r"(?u)\w+|[ ,.;!?'%#-]", text):
+        for word in findall(r"(?u)\w+|[ ,.;!?'%#-]", text.lower()):
             if len(word) < 100:
                 syllables = self.syllable_extractor.syllables(word)
                 if syllables == []: # for one-syllable-words and puctuation
@@ -88,28 +88,38 @@ class Vocab:
                     else: 
                         self.syllable2index[syllable][1] += 1
             else:
-                print word, ' could not be included into library of vocabulary'
+                print word, ' could not be included into library of vocabulary. its too long.'
 
     def __call__(self, line):
         """
         Convert from numerical representation to words
         and vice-versa.
         """
-        if type(line) is np.ndarray:
+        if type(line) is np.ndarray: 
+            print 'np.array'
             return "".join([self.index2syllable[syllable] for syllable in line])
         if type(line) is list:
-            if len(line) > 0:
+            print 'list'
+            if len(line) > 0: # got 
                 if line[0] is int:
                     return "".join([self.index2syllable[syllable] for syllable in line])
             indices = np.zeros(len(line), dtype=np.int32)
         else:
-            line = findall(r"[\w']+|[.%'#,!?; ]", line)
-            indices = np.zeros(len(line), dtype=np.int32)
-        
-        for i, syllable in enumerate(line):
-            indices[i] = self.syllable2index.get(syllable, self.unknown)[0]
+            text2syllables = []
+            for word in findall(r"(?u)\w+|[ ,.;!?'%#-]", line.lower()):
+                if len(word) < 100:
+                    syllables = self.syllable_extractor.syllables(word)
+                    if syllables == []: # for one-syllable-words and puctuation
+                        syllables = [word]
+                    for syllable in syllables:
+                        text2syllables.append(syllable)
+    
+            indices = np.zeros(len(text2syllables), dtype=np.int32)
+
+            for i, syllable in enumerate(text2syllables):
+                indices[i] = self.syllable2index.get(syllable, self.unknown)[0]
             
-        return indices
+            return indices
     
     @property
     def size(self):
@@ -172,7 +182,8 @@ if __name__=="__main__":
     vocabulary = Vocab()
     for article in articles():
         counter +=1
-        print 'article ', counter
+        print '\rprogress ', counter/17936.42
         vocabulary.add_syllables(article)
-
-    vocabulary.save(outdir='/home/karen/projects/LSTM_RNN_PoetryGenerator/data/')
+    #vocabulary.show_occurence()
+    vocabulary.restrict_vocabs(5000)
+    vocabulary.save(outdir='../data/')

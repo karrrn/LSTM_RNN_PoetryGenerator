@@ -1,16 +1,18 @@
 #--------------------------------------
 # Libraries
 #--------------------------------------
-#%load_ext autoreload
-#%autoreload 2
+
 import theano, theano.tensor as T
 import theano_lstm
 from theano_lstm import Embedding, LSTM, RNN, StackedCells, Layer, create_optimization_updates, masked_loss
 
 import numpy as np
 import random
+import re
+from time import time
 
 from load_wiki import Wiki_articles, Vocab
+floatX = theano.config.floatX
 
 
 def pad_into_matrix(rows, padding = 0):
@@ -18,12 +20,14 @@ def pad_into_matrix(rows, padding = 0):
         return np.array([0, 0], dtype=np.int32)
     lengths = [i for i in map(len, rows)]
     width = max(lengths)
+    #width = 2500
     height = len(rows)
     mat = np.empty([height, width], dtype=rows[0].dtype)
     mat.fill(padding)
     for i, row in enumerate(rows):
         mat[i, 0:len(row)] = row
     return mat, list(lengths)
+    #return width
 
 #--------------------------------------
 # Model
@@ -162,10 +166,10 @@ class Model:
         # all sentences start at T=0:
         starting_when = T.zeros_like(self.for_how_long)
                                  
-        self.cost = masked_loss(self.predictions,
+        self.cost = T.mean(masked_loss(self.predictions,
                                 what_to_predict,
                                 for_how_long,
-                                starting_when).sum()
+                                starting_when))
         
     def create_predict_function(self):
         self.pred_fun = theano.function(
@@ -192,31 +196,54 @@ class Model:
         return self.pred_fun(x)
 
 def main():	
-	# generate dataset                
-	articles = Wiki_articles()
-    vocabulary = Vocab(syllable2index = '../data/vocabulary_10K')
-    
-    numerical_lines =[]
+    # generate dataset                
+    articles = Wiki_articles()
+    vocabulary = Vocab(syllable2index = '../data/vocabulary')
+
+    print 'Build model ...'
+    # construct model & theano functions:
+    model = Model(
+        input_size=100,
+        hidden_size=100,
+        vocab_size=len(vocabulary),
+        stack_size=4, # make this bigger, but makes compilation slow
+        celltype=LSTM # use RNN or LSTM
+    )
+    #model.stop_on(vocabulary.syllable2index[u"."])
+
+    #trian
+    print 'Training'
+    # gross und kleinschreibung abschaffen!!!
+    time_0 = time()
+    #width = 0
+    update_counter = 0
+    article_counter = 0
     for article in articles():
-	    numerical_lines.append(vocabulary(article))
-	numerical_lines, numerical_lengths = pad_into_matrix(numerical_lines)
-
-	# construct model & theano functions:
-	model = Model(
-	    input_size=700,
-	    hidden_size=700,
-	    vocab_size=len(vocabulary),
-	    stack_size=5, # make this bigger, but makes compilation slow
-	    celltype=LSTM # use RNN or LSTM
-	)
-	model.stop_on(vocabulary.syllable2index[u"."])
-
-	# train:
-	for i in range(10000):
-	    if i % 100 == 0:
-	        print("epoch %(epoch)d, error=%(error).2f" % ({"epoch": i, "error": model.update_fun(numerical_lines, numerical_lengths)}))
-	    if i % 500 == 0:
-	        print(vocabulary(model.greedy_fun(vocabulary.syllable2index[u"the"])))
+        start = time()
+        article_counter += 1
+        sentences = article.split(u'.')
+        numerical_lines = []
+        for sentence in sentences:
+            numerical_lines.append(vocabulary(sentence+u'.'))
+        #dummy = pad_into_matrix(numerical_lines)
+        #if dummy  > width:
+            #width = dummy
+            #print width
+        numerical_lines, numerical_lengths = pad_into_matrix(numerical_lines)
+        #print numerical_lines
+        #lksaf
+        error = model.update_fun(numerical_lines, numerical_lengths) 
+        if article_counter % 500 == 0:
+            print(vocabulary(model.greedy_fun(vocabulary.syllable2index[u"Die"][0])))
+        print 'Iteration: ',
+        print article_counter,
+        print  'Update duration: ',
+        print  time()-start,
+        print 'Total time: ',
+        print time()-time_0,
+        print 'error: ',
+        print error
 
 if __name__ == '__main__':
 	main()
+
