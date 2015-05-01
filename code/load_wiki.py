@@ -5,7 +5,7 @@
 
 """
 
-__author__      = ["Karen Ullrich","Jonathan Raiman"]
+__author__      = ["Karen Ullrich"]
 __email__       = "karen.ullrich@ofai.at"
 
 #-------------------------------------------------------
@@ -96,10 +96,8 @@ class Vocab:
         and vice-versa.
         """
         if type(line) is np.ndarray: 
-            print 'np.array'
             return "".join([self.index2syllable[syllable] for syllable in line])
         if type(line) is list:
-            print 'list'
             if len(line) > 0: # got 
                 if line[0] is int:
                     return "".join([self.index2syllable[syllable] for syllable in line])

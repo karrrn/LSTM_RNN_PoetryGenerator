@@ -10,6 +10,7 @@ import numpy as np
 import random
 import re
 from time import time
+import cPickle as pickle
 
 from load_wiki import Wiki_articles, Vocab
 floatX = theano.config.floatX
@@ -78,7 +79,7 @@ class Model:
     what size their memory should be, and how many
     words can be predicted.
     """
-    def __init__(self, hidden_size, input_size, vocab_size, stack_size=1, celltype=LSTM):
+    def __init__(self, hidden_size, input_size, vocab_size, stack_size=1, celltype=LSTM, load_model=None):
         # declare model
         self.model = StackedCells(input_size, celltype=celltype, layers =[hidden_size] * stack_size)
         # add an embedding
@@ -100,6 +101,10 @@ class Model:
         self.create_cost_fun()
         self.create_training_function()
         self.create_predict_function()
+        if load_model is not None:
+            self.model.params = pickle.load(open( load_model, "rb" ))
+
+        #self.model.clip_gradients = True
         
     def stop_on(self, idx):
         self._stop_word.set_value(idx)
@@ -195,55 +200,60 @@ class Model:
     def __call__(self, x):
         return self.pred_fun(x)
 
-def main():	
+def main():
     # generate dataset                
     articles = Wiki_articles()
-    vocabulary = Vocab(syllable2index = '../data/vocabulary')
+    vocabulary = Vocab(syllable2index = '../data/vocabulary_3K')
 
     print 'Build model ...'
-    # construct model & theano functions:
+        # construct model & theano functions:
     model = Model(
-        input_size=100,
-        hidden_size=100,
+        input_size=1200,
+        hidden_size=1200,
         vocab_size=len(vocabulary),
-        stack_size=4, # make this bigger, but makes compilation slow
-        celltype=LSTM # use RNN or LSTM
+        stack_size=1, # make this bigger, but makes compilation slow
+        celltype=LSTM, # use RNN or LSTM
+        load_model = "model_backup.p",
     )
+
     #model.stop_on(vocabulary.syllable2index[u"."])
+    
+    try:
+        #train
+        print 'Training'
+        time_0 = time()
+        update_counter = 0
+        article_counter = 0
+        for article in articles():
+            start = time()
+            article_counter += 1
+            sentences = article.split(u'.')
+            numerical_lines = []
+            for sentence in sentences:
+                numerical_lines.append(vocabulary(sentence+u'.'))
+            numerical_lines, numerical_lengths = pad_into_matrix(numerical_lines)
+            error = model.update_fun(numerical_lines, numerical_lengths) 
+            if article_counter % 100 == 0:
+                print(vocabulary(model.greedy_fun(vocabulary.syllable2index[u"die"][0])))
+            print 'Iteration: ',
+            print article_counter,
+            print  'Update duration: ',
+            print  time()-start,
+            print 'Total time: ',
+            print (time()-time_0)/3600,
+            print 'error: ',
+            print error
 
-    #trian
-    print 'Training'
-    # gross und kleinschreibung abschaffen!!!
-    time_0 = time()
-    #width = 0
-    update_counter = 0
-    article_counter = 0
-    for article in articles():
-        start = time()
-        article_counter += 1
-        sentences = article.split(u'.')
-        numerical_lines = []
-        for sentence in sentences:
-            numerical_lines.append(vocabulary(sentence+u'.'))
-        #dummy = pad_into_matrix(numerical_lines)
-        #if dummy  > width:
-            #width = dummy
-            #print width
-        numerical_lines, numerical_lengths = pad_into_matrix(numerical_lines)
-        #print numerical_lines
-        #lksaf
-        error = model.update_fun(numerical_lines, numerical_lengths) 
-        if article_counter % 500 == 0:
-            print(vocabulary(model.greedy_fun(vocabulary.syllable2index[u"Die"][0])))
-        print 'Iteration: ',
-        print article_counter,
-        print  'Update duration: ',
-        print  time()-start,
-        print 'Total time: ',
-        print time()-time_0,
-        print 'error: ',
-        print error
+    except KeyboardInterrupt:
+        pickle.dump(model.model.params,open( "model_backup.p", "wb" ))
+        try:
+            pickle.dump(model.model.params,open( "model_backup.p", "wb" ))
+            print "Model saved. Exiting ..."
+        except: 
+            print "Exiting without saving a model."
+            
 
-if __name__ == '__main__':
-	main()
 
+if __name__ == "__main__":
+
+    main()   
