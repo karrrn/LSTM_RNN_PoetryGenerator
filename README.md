@@ -4,4 +4,4 @@ So here is the approach: We take an LSTM recurrent neural network (non-linear di
 
 When training is done we can generate an entire song text  by giving the model a random or chosen word/phrase. We can also interrupt at any point, change phrases and the model will react on that. Its interesting to see if it can learn rhythms and rhymes from syllables.
 
-For the camp that's as much as  we want to present. In a larger context, the resulting texts are supposed to be performed by humans in contrast to the by now overused approach to let a computer read human written text.
+In a larger context, the resulting texts are supposed to be performed by humans in contrast to the by now overused approach to let a computer read human written text.
